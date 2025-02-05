@@ -62,10 +62,13 @@ void write_file(int sockfd, struct sockaddr_in addr)
     fclose(fp);
 }
 
-int main()
-{
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <server_ip> \n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
     // Définition du serveur
-    char* ip = "127.0.0.1";
+    char* ip = argv[1];
     const int port = 8080;
     int server_sockfd;
     struct sockaddr_in server_addr, client_addr;

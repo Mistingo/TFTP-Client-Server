@@ -4,76 +4,81 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define SIZE 1024
+#define SIZE 516
+#define TFTP_DIR "/var/lib/tftpboot/"  // Dossier où sont stockés les fichiers
 
-void write_file(int sockfd, struct sockaddr_in addr)
+void read_file(int sockfd, struct sockaddr_in addr)
 {
+    int n;
+    char buffer[SIZE];
+    socklen_t addr_size = sizeof(addr);
 
-  char* filename = "testServeur.txt";
-  int n;
-  char buffer[SIZE];
-  socklen_t addr_size;
-
-  // Creating a file.
-  FILE* fp = fp = fopen(filename, "w");
-
-  // Receiving the data and writing it into the file.
-  while (1)
-  {
-    addr_size = sizeof(addr);
+    // Réception du nom du fichier demandé
     n = recvfrom(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, &addr_size);
-
-    if (strcmp(buffer, "END") == 0)
-    {
-      break;
+    if (n <= 0) {
+        perror("[ERROR] Échec de la réception du nom du fichier.");
+        return;
     }
 
-    printf("[RECEVING] Data: %s", buffer);
-    fprintf(fp, "%s", buffer);
-    bzero(buffer, SIZE);
-  }
+    buffer[n] = '\0';
+    char filepath[1024];
+    snprintf(filepath, sizeof(filepath), "%s%s", TFTP_DIR, buffer);
+    printf("[INFO] Demande de fichier reçue : %s\n", filepath);
 
-  fclose(fp);
+    // Ouverture du fichier pour lecture
+    FILE* fp = fopen(filepath, "r");
+    if (fp == NULL) {
+        perror("[ERROR] Fichier introuvable.");
+        return;
+    }
+
+    // Envoi du contenu du fichier
+    while (fgets(buffer, SIZE, fp) != NULL) {
+        sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&addr, addr_size);
+        printf("[SENDING] Data envoyée : %s", buffer);
+        memset(buffer, 0, SIZE);
+    }
+
+    // Signal de fin
+    strcpy(buffer, "END");
+    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&addr, addr_size);
+    printf("[INFO] Fin de la transmission du fichier.\n");
+    fclose(fp);
 }
 
-int main()
-{
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <server_ip>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-  // Defining the IP and Port
-  char* ip = "127.0.0.1";
-  const int port = 8080;
+    char *ip = argv[1];
+    const int port = 8080;
+    int server_sockfd;
+    struct sockaddr_in server_addr, client_addr;
 
-  // Defining variables
-  int server_sockfd;
-  struct sockaddr_in server_addr, client_addr;
-  char buffer[SIZE];
-  int e;
+    server_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_sockfd < 0) {
+        perror("[ERROR] Échec de la création du socket.");
+        exit(1);
+    }
 
-  // Creating a UDP socket
-  server_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (server_sockfd < 0)
-  {
-    perror("[ERROR] socket error");
-    exit(1);
-  }
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = port;
-  server_addr.sin_addr.s_addr = inet_addr(ip);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip);
 
-  e = bind(server_sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
-  if (e < 0)
-  {
-    perror("[ERROR] bind error");
-    exit(1);
-  }
+    if (bind(server_sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("[ERROR] Échec du bind.");
+        exit(1);
+    }
 
-  printf("[STARTING] UDP File Server started. \n");
-  write_file(server_sockfd, client_addr);
+    printf("[STARTING] Serveur TFTP UDP démarré.\n");
 
-  printf("[SUCCESS] Data transfer complete.\n");
-  printf("[CLOSING] Closing the server.\n");
+    read_file(server_sockfd, client_addr);
 
-  close(server_sockfd);
+    printf("[SUCCESS] Transfert terminé.\n");
+    printf("[CLOSING] Fermeture du serveur.\n");
 
-  return 0;
+    close(server_sockfd);
+    return 0;
 }

@@ -3,72 +3,102 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+
 #define SIZE 1024
 
-void send_file_data(FILE* fp, int sockfd, struct sockaddr_in addr)
+void send_file_data(FILE* fp, int sockfd, struct sockaddr_in addr, char* filename)
 {
-  int n;
-  char buffer[SIZE];
+    int n;
+    char buffer[SIZE];
 
-  // Sending the data
-  while (fgets(buffer, SIZE, fp) != NULL)
-  {
-    printf("[SENDING] Data: %s", buffer);
-
-    n = sendto(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
-    if (n == -1)
-    {
-      perror("[ERROR] sending data to the server.");
-      exit(1);
+    // Envoi du nom du fichier
+    n = sendto(sockfd, filename, strlen(filename), 0, (struct sockaddr*)&addr, sizeof(addr));
+    if (n == -1) {
+        perror("[ERROR] Échec de l'envoi du nom du fichier.");
+        exit(1);
     }
-    bzero(buffer, SIZE);
-  }
+    printf("[SENDING] Nom du fichier envoyé : %s\n", filename);
 
-  // Sending the 'END'
-  strcpy(buffer, "END");
-  sendto(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
+    // Envoi des données du fichier
+    while (fgets(buffer, SIZE, fp) != NULL) {
+        n = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&addr, sizeof(addr));
+        if (n == -1) {
+            perror("[ERROR] Échec de l'envoi des données.");
+            exit(1);
+        }
+        printf("[SENDING] Data envoyée : %s", buffer);
+        memset(buffer, 0, SIZE);
+    }
 
-  fclose(fp);
+    // Signal de fin
+    strcpy(buffer, "END");
+    sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr*)&addr, sizeof(addr));
+
+    fclose(fp);
 }
 
-int main(void)
+void receive_file_data(int sockfd, struct sockaddr_in addr, char* filename)
 {
+    int n;
+    char buffer[SIZE];
+    socklen_t addr_size = sizeof(addr);
 
-  // Defining the IP and Port
-  char *ip = "127.0.0.1";
-  const int port = 8080;
+    // Envoi du nom du fichier demandé
+    sendto(sockfd, filename, strlen(filename), 0, (struct sockaddr*)&addr, sizeof(addr));
+    printf("[REQUEST] Demande de fichier : %s\n", filename);
 
-  // Defining variables
-  int server_sockfd;
-  struct sockaddr_in server_addr;
-  char *filename = "test.txt";
-  FILE *fp = fopen(filename, "r");
+    // Ouverture du fichier en écriture
+    FILE* fp = fopen(filename, "w");
+    if (fp == NULL) {
+        perror("[ERROR] Impossible de créer le fichier.");
+        return;
+    }
 
-  // Creating a UDP socket
-  server_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (server_sockfd < 0)
-  {
-    perror("[ERROR] socket error");
-    exit(1);
-  }
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = port;
-  server_addr.sin_addr.s_addr = inet_addr(ip);
+    // Réception des données
+    while (1) {
+        memset(buffer, 0, SIZE);
+        n = recvfrom(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, &addr_size);
+        if (n <= 0) {
+            perror("[ERROR] Problème de réception.");
+            break;
+        }
 
-  // Reading the text file
-  if (fp == NULL)
-  {
-    perror("[ERROR] reading the file");
-    exit(1);
-  }
+        if (strcmp(buffer, "END") == 0) {
+            printf("[INFO] Fin de la transmission.\n");
+            break;
+        }
 
-  // Sending the file data to the server
-  send_file_data(fp, server_sockfd, server_addr);
+        fwrite(buffer, 1, n, fp);
+        printf("[RECEIVING] Data écrit dans le fichier...\n");
+    }
 
-  printf("[SUCCESS] Data transfer complete.\n");
-  printf("[CLOSING] Disconnecting from the server.\n");
+    fclose(fp);
+}
 
-  close(server_sockfd);
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <server_ip> <file_name>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-  return 0;
+    char *ip = argv[1];
+    const int port = 8080;
+    int sockfd;
+    struct sockaddr_in server_addr;
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        perror("[ERROR] Échec de la création du socket.");
+        exit(1);
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip);
+
+    receive_file_data(sockfd, server_addr, argv[2]);
+
+    printf("[SUCCESS] Transfert terminé.\n");
+    close(sockfd);
+    return 0;
 }

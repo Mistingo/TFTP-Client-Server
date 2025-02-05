@@ -40,14 +40,32 @@ void send_file_data(FILE* fp, int sockfd, struct sockaddr_in addr, char* filenam
     fclose(fp);
 }
 
-int main(void)
-{
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <server_ip> <file_name> \n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
     // Définition du serveur
-    char *ip = "127.0.0.1";
+    char *ip = argv[1];
     const int port = 8080;
     int server_sockfd;
     struct sockaddr_in server_addr;
-    char *filename = "test.txt";
+
+    char input[256];
+/*
+    while(1) {
+        printf("tftp> ");
+
+        if (fgets(input, sizeof(input), stdin) != NULL) {
+            input[strcspn(input, "\n")] = '\0';
+            //printf("%s\n", input);
+            if (strcmp(input, "quit") == 0) {
+                exit(0);
+            }
+        }
+    }
+*/
+    char *filename = argv[2];
     FILE *fp = fopen(filename, "r");
 
     // Création du socket UDP
