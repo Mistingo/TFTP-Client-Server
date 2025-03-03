@@ -4,8 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define SIZE 516
-#define BLOCK_SIZE 512
+#define SIZE 512
 
 #define RRQ 1
 #define WRQ 2
@@ -76,14 +75,14 @@ void send_file_data(FILE* fp, int sockfd, struct sockaddr_in addr, char* filenam
         buffer[2] = (block_num >> 8) & 0xFF;
         buffer[3] = block_num & 0xFF;
 
-        n = fread(buffer + 4, 1, BLOCK_SIZE, fp);
+        n = fread(buffer + 4, 1, SIZE, fp);
         sendto(sockfd, buffer, n + 4, 0, (struct sockaddr*)&addr, sizeof(addr));
 
         recvfrom(sockfd, buffer, SIZE, 0, (struct sockaddr*)&addr, &addr_size);
         if ((buffer[0] << 8 | buffer[1]) != ACK) break;
 
         block_num++;
-        if (n < BLOCK_SIZE) break;
+        if (n < SIZE) break;
     }
 
     fclose(fp);
@@ -96,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
 
     char *ip = argv[1];
-    const int port = htons(6969);
+    const int port = htons(69);
     int sockfd;
     struct sockaddr_in server_addr;
     char command[SIZE], filename[SIZE];
@@ -124,9 +123,18 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            char request[SIZE + 10];
+            char request[SIZE + 10]; /***********************************/
             int req_len = sprintf(request, "%c%c%s%c%s%c", 0, WRQ, filename, 0, "octet", 0);
             sendto(sockfd, request, req_len, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+
+	    char response[SIZE];
+	    socklen_t addr_size = sizeof(server_addr);
+	    int n = recvfrom(sockfd, response, SIZE, 0, (struct sockaddr*)&server_addr, &addr_size);
+	    if (n < 4 || response[0] << 8 | response[1] != ACK) {
+	    	printf("tftp> Le serveur n'a pas confirmé l'écriture du fichier.\n");
+	    	fclose(fp);
+	    	continue;
+	    }
 
             send_file_data(fp, sockfd, server_addr, filename);
         } 
