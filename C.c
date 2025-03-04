@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
 
     char *ip = argv[1];
-    const int port = htons(69);
+    const int port = htons(6969);
     int sockfd;
     struct sockaddr_in server_addr;
     char command[SIZE], filename[SIZE];
