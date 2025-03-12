@@ -1,8 +1,2 @@
 # TFTP
-Cli.c       --> Fichier client mono-clients
-
-Cli2.c      --> Fichier client multi-clients (avec select())
-
-Serv.c      --> Fichier serveur mono-clients
-
-MultiServ.c --> Fichier serveur multi-clients (avec select())
+[WARNING] Don't forget to put the right path of your tftpboot in the TFTP_DIR constant (line 25) : #define TFTP_DIR "/var/lib/tftpboot/"
