@@ -118,7 +118,7 @@ The project supports concurrent accesses using:
 
 ### Mutex synchronization
 
-```
+```c
 pthread_mutex_t
 ```
 
@@ -179,6 +179,7 @@ Network traces were analysed with Wireshark.
 
 ## Architecture
 
+```text
 Client
 ↓
 UDP communication
@@ -188,12 +189,15 @@ Server
 Session manager
 ↓
 File system
+```
 
 Concurrent mode:
 
+```text
 Client 1 → Thread 1
 Client 2 → Thread 2
 Client 3 → Thread 3
+```
 
 ---
 
