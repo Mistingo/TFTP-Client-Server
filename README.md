@@ -180,14 +180,14 @@ Network traces were analysed with Wireshark.
 ## Architecture
 
 ```text
-Client
-↓
+    Client
+      ↓
 UDP communication
-↓
-Server
-↓
+      ↓
+    Server
+      ↓
 Session manager
-↓
+      ↓
 File system
 ```
 
